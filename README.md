@@ -28,7 +28,7 @@ The primary use case for this project is to work on embedded Linux systems, allo
 Run the server on your target machine (ie embedded Linux system):
 
 ```bash
-./sprox -server -port /dev/ttyUSB0 -baud 115200 -ports 9922->192.168.0.31:22,9980->127.0.0.1:8080
+./sprox -server -port /dev/ttyGS0 -baud 115200 -ports 9922->192.168.0.31:22,9980->127.0.0.1:8080
 ```
 
 ### Client Side (Raspberry Pi)
