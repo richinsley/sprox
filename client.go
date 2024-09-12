@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"go.bug.st/serial"
 )
 
-func runClient(port serial.Port, portMappings []PortMapping) {
+func runClient(port serial.Port, portMappings []PortMapping, verbose bool) {
 	log.Println("Running as client")
 	sendHello(port)
 	waitHello(port)
@@ -17,20 +18,20 @@ func runClient(port serial.Port, portMappings []PortMapping) {
 	go serialWriter(port)
 
 	for _, mapping := range portMappings {
-		go listenAndProxy(mapping)
+		go listenAndProxy(mapping, verbose)
 	}
 
 	for {
-		packet, err := readPacket(port)
+		packet, err := readPacket(port, verbose)
 		if err != nil {
 			log.Printf("Error reading packet: %v", err)
-			continue
+			os.Exit(1)
 		}
-		handleSerialPacket(packet)
+		handleSerialPacket(packet, verbose)
 	}
 }
 
-func listenAndProxy(mapping PortMapping) {
+func listenAndProxy(mapping PortMapping, verbose bool) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", mapping.LocalHost, mapping.LocalPort))
 	if err != nil {
 		log.Printf("Failed to listen on port %s:%d: %v", mapping.LocalHost, mapping.LocalPort, err)
@@ -57,7 +58,10 @@ func listenAndProxy(mapping PortMapping) {
 			connectionsMutex.Lock()
 			delete(connections, cid)
 			connectionsMutex.Unlock()
+			conn.Close()
 			continue
+		} else if verbose {
+			log.Printf("Proxy initialized for %s:%d->%s:%d", mapping.LocalHost, mapping.LocalPort, mapping.RemoteHost, mapping.RemotePort)
 		}
 		go handleConnection(conn, cid)
 	}

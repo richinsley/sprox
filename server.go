@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
 	"go.bug.st/serial"
 )
 
-func runServer(port serial.Port, portMappings []PortMapping) {
+func runServer(port serial.Port, portMappings []PortMapping, verbose bool) {
 	log.Println("Running as server")
 	waitHello(port)
 	sendHello(port)
@@ -19,16 +20,16 @@ func runServer(port serial.Port, portMappings []PortMapping) {
 	go serialWriter(port)
 
 	for _, mapping := range portMappings {
-		go listenAndProxy(mapping)
+		go listenAndProxy(mapping, verbose)
 	}
 
 	for {
-		packet, err := readPacket(port)
+		packet, err := readPacket(port, verbose)
 		if err != nil {
 			log.Printf("Error reading packet: %v", err)
-			break
+			os.Exit(1)
 		}
-		handleSerialPacket(packet)
+		handleSerialPacket(packet, verbose)
 	}
 }
 

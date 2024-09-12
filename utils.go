@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.bug.st/serial"
 )
 
 type PortMapping struct {
@@ -114,7 +116,7 @@ func parsePortMappings(mappings string) ([]PortMapping, error) {
 	var result []PortMapping
 	pairs := strings.Split(mappings, ",")
 	for _, pair := range pairs {
-		ports := strings.Split(pair, "->")
+		ports := strings.Split(pair, "-")
 		if len(ports) != 2 {
 			return nil, fmt.Errorf("invalid port mapping: %s", pair)
 		}
@@ -139,12 +141,17 @@ func parsePortMappings(mappings string) ([]PortMapping, error) {
 	return result, nil
 }
 
-func handleResponse(packet Packet) {
+func handleResponse(packet Packet, verbose bool) {
 	var response ResponsePacket
 	if err := json.Unmarshal(packet.Payload, &response); err != nil {
 		log.Printf("Error unmarshaling response packet: %v", err)
 		return
 	}
+
+	if verbose {
+		log.Printf("Received response packet: %d", response.RequestID)
+	}
+
 	pendingResponseMutex.Lock()
 	if ch, ok := pendingResponses[response.RequestID]; ok {
 		ch <- response
@@ -153,12 +160,12 @@ func handleResponse(packet Packet) {
 	pendingResponseMutex.Unlock()
 }
 
-func sendHello(w io.Writer) {
+func sendHello(w serial.Port) {
 	sendPacket(w, Packet{Type: PacketTypeHello, Payload: []byte("HELLO")})
 }
 
 func waitHello(r io.Reader) error {
-	packet, err := readPacket(r)
+	packet, err := readPacket(r, false)
 	if err != nil {
 		return err
 	}
@@ -169,7 +176,7 @@ func waitHello(r io.Reader) error {
 	return nil
 }
 
-func handleSerialPacket(packet Packet) {
+func handleSerialPacket(packet Packet, verbose bool) {
 	switch packet.Type {
 	case PacketTypeHello:
 		log.Printf("Received hello: %s", string(packet.Payload))
@@ -194,6 +201,9 @@ func handleSerialPacket(packet Packet) {
 			return
 		}
 
+		if verbose {
+			log.Printf("Sending %d bytes to connection %d", len(data), connectionID)
+		}
 		_, err := conn.Write(data)
 		if err != nil {
 			log.Printf("Error writing to TCP connection: %v", err)
@@ -210,9 +220,13 @@ func handleSerialPacket(packet Packet) {
 		if ok {
 			delete(connections, uint32(connectionID))
 			conn.Close()
+		} else {
+			log.Printf("PacketTypeClosePort: No connection found for connection ID %d", connectionID)
 		}
 		connectionsMutex.Unlock()
 	case PacketTypeResponse:
-		handleResponse(packet)
+		handleResponse(packet, verbose)
+	default:
+		log.Printf("Unknown packet type: %d", packet.Type)
 	}
 }

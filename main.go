@@ -11,7 +11,8 @@ func main() {
 	portName := flag.String("port", "", "Serial port name")
 	baudRate := flag.Int("baud", 115200, "Baud rate")
 	isServer := flag.Bool("server", false, "Run as server")
-	portMappings := flag.String("ports", "", "Comma-separated list of local:remote port mappings (e.g., 80:8081,1537:2537)")
+	portMappings := flag.String("ports", "", "Comma-separated list of local:remote port mappings (e.g., 80-8081,1537-2537)")
+	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
 
 	if *portName == "" {
@@ -36,7 +37,7 @@ func main() {
 		}
 		defer port.Close()
 
-		runServer(port, mappings)
+		runServer(port, mappings, *verbose)
 	} else {
 		var mappings []PortMapping
 		if *portMappings != "" {
@@ -51,6 +52,6 @@ func main() {
 			log.Fatalf("Failed to open serial port: %v", err)
 		}
 		defer port.Close()
-		runClient(port, mappings)
+		runClient(port, mappings, *verbose)
 	}
 }
